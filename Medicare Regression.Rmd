@@ -1,0 +1,574 @@
+---
+title: "Medicare Regression project"
+author: "Elias Fedai"
+date: "10/5/2021"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+```{r}
+library(ggplot2)
+library(mlr)
+
+library(GGally)
+library(cowplot)
+library(dplyr)
+library(tidyr)
+library(readr)
+library(magrittr)
+library(moments)
+library(plyr)
+
+library(corrplot)
+library(ggcorrplot)
+library(mlbench)
+library(pROC)
+library(e1071)
+
+
+```
+
+```{r}
+#loading data
+df_14 <- read.csv(file.choose(),na = "?", stringsAsFactors = FALSE, header=F)
+df_15 <- read.csv(file.choose(),na = "?", stringsAsFactors = FALSE, header=F)
+df_16 <- read.csv(file.choose(),na = "?", stringsAsFactors = FALSE, header=F)
+df_17 <- read.csv(file.choose(),na = "?", stringsAsFactors = FALSE, header=F)
+df_18 <- read.csv(file.choose(),na = "?", stringsAsFactors = FALSE, header=F)
+df_19 <- read.csv(file.choose(),na = "?", stringsAsFactors = FALSE, header=F)
+
+```
+
+```{r}
+df_17<- df_17[-1,]
+df_18<- df_18[-1,]
+df_16<- df_16[-1,]
+df_14<- df_14[-1,]
+df_15<- df_15[-1,]
+df_19<- df_19[-1,]
+```
+
+```{r}
+#creating a column for year
+
+df_19$V10<- 2019
+df_14$V10<- 2014
+df_15$V10<- 2015
+df_16$V10<- 2016
+
+```
+
+
+```{r}
+df_14
+df_15
+df_16
+df_17
+df_18
+df_19
+
+```
+
+```{r}
+combined<- rbind(df_17,df_18,df_19,df_14,df_15,df_16)
+```
+
+```{r}
+#assigning column names
+
+names(combined) <- c('Rndrng_Prvdr_Geo_Lvl', 'Rndrng_Prvdr_Geo_Cd', 'Rndrng_Prvdr_Geo_Desc', 'DRG_Cd','DRG_Desc', 'Tot_Dschrgs', 'Avg_Submtd_Cvrd_Chrg', 'Avg_Tot_Pymt_Amt', 'Avg_Mdcr_Pymt_Amt', 'year')
+
+
+```
+```{r}
+
+
+```
+
+```{r}
+#removing columns not needed for this analysis
+
+sub_df = subset(combined, select = -c(Rndrng_Prvdr_Geo_Lvl,Rndrng_Prvdr_Geo_Cd) )
+
+```
+
+```{r}
+sub_df
+```
+
+```{r}
+#removing national rows
+
+subs_df<- subset(sub_df, Rndrng_Prvdr_Geo_Desc!= 'National')
+
+```
+
+```{r}
+
+```
+
+```{r}
+
+subs_df$Tot_Dschrgs <- as.numeric(subs_df$Tot_Dschrgs)  
+subs_df$Avg_Submtd_Cvrd_Chrg <- as.numeric(subs_df$Avg_Submtd_Cvrd_Chrg) 
+subs_df$Avg_Mdcr_Pymt_Amt<- as.numeric(subs_df$Avg_Mdcr_Pymt_Amt)
+subs_df$Avg_Tot_Pymt_Amt <- as.numeric(subs_df$Avg_Tot_Pymt_Amt)
+subs_df$DRG_Cd <- as.numeric(subs_df$DRG_Cd)
+
+```
+```{r}
+str(subs_df)
+```
+```{r}
+summary(subs_df)
+
+```
+
+```{r}
+
+# aggregated average total payment by geo location
+
+agg_avg<- aggregate( Avg_Tot_Pymt_Amt ~ Rndrng_Prvdr_Geo_Desc, subs_df, mean)
+order_agg_avg<- agg_avg[order(agg_avg$Avg_Tot_Pymt_Amt), ]
+order_agg_avg
+```
+
+```{r}
+tail_order <- tail(order_agg_avg, n=10)
+```
+
+```{r}
+head_order <- head(order_agg_avg, n=10)
+```
+
+```{r}
+# 10 States with the highest Average total payment amount
+ggplot(tail_order, aes(x=Rndrng_Prvdr_Geo_Desc, y=Avg_Tot_Pymt_Amt)) + 
+  geom_bar(stat = "identity") +
+  coord_flip()
+```
+
+```{r}
+
+
+# 10 States with the lowest Average total payment amount
+ggplot(head_order, aes(x=Rndrng_Prvdr_Geo_Desc, y=Avg_Tot_Pymt_Amt)) + 
+  geom_bar(stat = "identity") +
+  coord_flip()
+
+```
+
+```{r}
+
+#aggregating surgical procedure by avg total payment amount
+
+agg_procedure<- aggregate( Avg_Tot_Pymt_Amt ~ DRG_Desc, subs_df, mean)
+order_agg_procedure<- agg_procedure[order(agg_procedure$Avg_Tot_Pymt_Amt), ]
+order_agg_procedure
+
+
+```
+
+```{r}
+# top 10 procedures with highest average total payments
+
+tail_procedure <- tail(order_agg_procedure, n=10)
+head_procedure <- head(order_agg_procedure, n=10)
+print(tail_procedure)
+```
+
+```{r}
+
+# top 10 procedures with highest average total payments
+
+ggplot(tail_procedure, aes(x=DRG_Desc, y=Avg_Tot_Pymt_Amt)) +
+  geom_point() + 
+  geom_segment( aes(x=DRG_Desc, xend=DRG_Desc, yend=Avg_Tot_Pymt_Amt))+coord_flip()
+
+  
+
+
+```
+
+```{r}
+
+# top 10 procedures with lowest average total payments
+
+ggplot(head_procedure, aes(x=DRG_Desc, y=Avg_Tot_Pymt_Amt)) +
+  geom_point() + 
+  geom_segment( aes(x=DRG_Desc, xend=DRG_Desc, y=0, yend=Avg_Tot_Pymt_Amt))+coord_flip()
+
+```
+
+```{r}
+
+#aggregrate total discharges by year
+
+
+year_agg <- aggregate(subs_df['Tot_Dschrgs'], by=subs_df['year'], sum)
+year_agg
+```
+```{r}
+
+medi_year<- aggregate(subs_df['Avg_Mdcr_Pymt_Amt'], by=subs_df['year'], sum)
+medi_year
+```
+
+
+```{r}
+ggplot(year_agg, aes(x=year, y=Tot_Dschrgs)) + 
+  geom_bar(stat="identity", width=.5, fill="tomato3") + 
+  labs(title="Ordered Bar Chart", 
+       subtitle="Total discharge by year", 
+       caption="source: CMS.gov") + 
+  theme(axis.text.x = element_text(angle=65, vjust=0.6))
+
+
+```
+```{r}
+
+ggplot(medi_year, aes(x=year, y=Avg_Mdcr_Pymt_Amt)) + 
+  geom_bar(stat="identity", width=.5, fill="blue") + 
+  labs(title="Ordered Bar Chart", 
+       subtitle="Total Medicare payouts by year", 
+       caption="source: CMS.gov") + 
+  theme(axis.text.x = element_text(angle=65, vjust=0.6))
+
+
+```
+```{r}
+discharg_year<- aggregate(subs_df['Tot_Dschrgs'], by=subs_df['Rndrng_Prvdr_Geo_Desc'], sum)
+
+tail_dicharge <- tail(discharg_year, n=10)
+head_discharge <- head(discharg_year, n=10)
+head_discharge
+```
+
+```{r}
+ggplot(head_discharge, 
+       aes(x = Tot_Dschrgs, 
+           y=reorder(Rndrng_Prvdr_Geo_Desc,Tot_Dschrgs))) +
+  geom_point() +
+  labs(title = "Top 10 Total Discharges by States")
+```
+```{r}
+
+ggplot(tail_dicharge, 
+       aes(x = Tot_Dschrgs, 
+           y=reorder(Rndrng_Prvdr_Geo_Desc,Tot_Dschrgs))) +
+  geom_point() +
+  labs(title = "Top 10 Least Total Discharges by States")
+
+```
+
+
+```{r}
+ggplot(medi_year, aes(x=year, y=Avg_Mdcr_Pymt_Amt)) + 
+  geom_bar(stat="identity", width=.5, fill="blue") + 
+  labs(title="Ordered Bar Chart", 
+       subtitle="Total Medicare payouts by year", 
+       caption="source: CMS.gov") + 
+  theme(axis.text.x = element_text(angle=65, vjust=0.6))
+
+
+```
+```{r}
+library(Hmisc)
+
+hist.data.frame(subs_df)
+```
+
+
+```{r}
+
+```
+
+
+```{r}
+sorted_data <- sort(subs_df$Avg_Mdcr_Pymt_Amt)
+cdf_avg_cost <- ecdf(sorted_data)
+plot(cdf_avg_cost, xlab='x', ylab='CDF', main='CDF of Average medicare payment')
+
+```
+
+```{r}
+
+g <- ggplot(subs_df, aes(Avg_Submtd_Cvrd_Chrg,Avg_Mdcr_Pymt_Amt))
+
+g + geom_point() + 
+  geom_smooth(method="lm", se=F) +
+  labs(subtitle="Avg Medicare payment vs Avg Submitted covered charge", 
+       y="Avg Submitted Covered Charge", 
+       x="Avg Medicare payment amount", 
+       title="Scatterplot with overlapping points", 
+       caption="Source: CMS.gov")
+
+
+```
+```{r}
+subs_df
+
+```
+
+```{r}
+p <- ggplot(subs_df, aes(Avg_Submtd_Cvrd_Chrg,Avg_Tot_Pymt_Amt))
+
+p + geom_point() + 
+  geom_smooth(method="lm", se=F) +
+  labs(subtitle="Avg total payment vs Avg Submitted covered charge", 
+       y="Avg Submitted Covered Charge", 
+       x="Avg total payment ", 
+       title="Scatterplot with overlapping points", 
+       caption="Source: CMS.gov")
+
+
+
+
+```
+```{r}
+
+
+m <- ggplot(subs_df, aes(Tot_Dschrgs,Avg_Mdcr_Pymt_Amt))
+
+m + geom_point() + 
+  geom_smooth(method="lm", se=F) +
+  labs(subtitle="Tot_Dschrgs vs Avg_Mdcr_Pymt_Amt", 
+       y="Total discharge", 
+       x="Avg total payment ", 
+       title="Scatterplot with overlapping points", 
+       caption="Source: CMS.gov")
+
+```
+
+```{r}
+library(e1071)
+par(mfrow=c(1, 2))  # divide graph area in 2 columns
+plot(density(subs_df$Avg_Mdcr_Pymt_Amt), main="Density Plot: Avg  payment", ylab="Frequency", sub=paste("Skewness:", round(e1071::skewness(subs_df$Avg_Mdcr_Pymt_Amt), 2)))  # density plot for 'speed'
+polygon(density(subs_df$Avg_Mdcr_Pymt_Amt), col="red")
+plot(density(subs_df$Avg_Submtd_Cvrd_Chrg), main="Density Plot: Avg submitted ", ylab="Frequency", sub=paste("Skewness:", round(e1071::skewness(subs_df$Avg_Submtd_Cvrd_Chrg), 2)))  # density plot for 'dist'
+polygon(density(subs_df$Avg_Submtd_Cvrd_Chrg), col="red")
+
+
+```
+
+```{r}
+df_model <- subs_df[,c('Tot_Dschrgs','Avg_Submtd_Cvrd_Chrg','Avg_Tot_Pymt_Amt','Avg_Mdcr_Pymt_Amt')]
+summary(df_model)
+
+```
+
+
+
+```{r}
+df_models<- log(df_model)
+summary(df_models)
+```
+
+
+```{r}
+set.seed(100)
+
+index<- sample(1:nrow(df_models), 0.7*nrow(df_models))
+
+train = df_models[index,] # Create the training data 
+test = df_models[-index,] # Create the test data
+
+dim(train)
+dim(test)
+```
+
+```{r}
+fit1<- lm(Avg_Mdcr_Pymt_Amt~  Avg_Tot_Pymt_Amt+Avg_Submtd_Cvrd_Chrg+ Tot_Dschrgs, data=train)
+
+summary(fit1)
+```
+
+```{r}
+#Step 1 - create the evaluation metrics function
+
+eval_metrics = function(model, df, predictions, target){
+    resids = df[,target] - predictions
+    resids2 = resids**2
+    N = length(predictions)
+    r2 = as.character(round(summary(model)$r.squared, 2))
+    adj_r2 = as.character(round(summary(model)$adj.r.squared, 2))
+    print(adj_r2) #Adjusted R-squared
+    print(as.character(round(sqrt(sum(resids2)/N), 2))) #Residual standard error
+}
+
+# Step 2 - predicting and evaluating the model on train data
+predictions = predict(fit1, newdata = train)
+eval_metrics(fit1, train, predictions, target = 'Avg_Mdcr_Pymt_Amt')
+
+# Step 3 - predicting and evaluating the model on test data
+predictions = predict(fit1, newdata = test)
+eval_metrics(fit1, test, predictions, target = 'Avg_Mdcr_Pymt_Amt')
+
+
+```
+```{r}
+
+par(mfrow=c(2,2))
+plot(fit1)
+
+```
+
+```{r}
+#testing for multicollinerity
+
+library(car)
+vif(fit1)
+
+```
+
+```{r}
+# correlation
+
+library("Hmisc")
+res2 <- rcorr(as.matrix(df_models))
+res2
+
+```
+
+```{r}
+cov_df<-cov(as.matrix(df_models))
+cov_df
+
+```
+```{r}
+df_models
+
+```
+```{r}
+library(plyr)
+library(readr)
+library(dplyr)
+library(caret)
+library(ggplot2)
+library(repr)
+
+cols_reg<- c('Tot_Dschrgs','Avg_Submtd_Cvrd_Chrg','Avg_Tot_Pymt_Amt','Avg_Mdcr_Pymt_Amt')
+dummies <- dummyVars(Avg_Mdcr_Pymt_Amt~ ., data = df_models[,cols_reg])
+
+train_dummies = predict(dummies, newdata = train[,cols_reg])
+
+test_dummies = predict(dummies, newdata = test[,cols_reg])
+
+print(dim(train_dummies)); print(dim(test_dummies))
+```
+
+```{r}
+#Ridge Regression
+
+library(glmnet)
+
+x = as.matrix(train_dummies)
+y_train = train$Avg_Mdcr_Pymt_Amt
+
+x_test = as.matrix(test_dummies)
+y_test = test$Avg_Mdcr_Pymt_Amt
+
+lambdas <- 10^seq(2, -3, by = -.1)
+ridge_reg = glmnet(x, y_train, nlambda = 25, alpha = 0, family = 'gaussian', lambda = lambdas)
+
+summary(ridge_reg)
+
+```
+
+
+```{r}
+#find the optimal lambda automatically
+
+cv_ridge <- cv.glmnet(x, y_train, alpha = 0, lambda = lambdas)
+optimal_lambda <- cv_ridge$lambda.min
+optimal_lambda
+# optimal lambda is 0.001
+```
+
+```{r}
+# Compute R^2 from true and predicted values
+eval_results <- function(true, predicted, df) {
+  SSE <- sum((predicted - true)^2)
+  SST <- sum((true - mean(true))^2)
+  R_square <- 1 - SSE / SST
+  RMSE = sqrt(SSE/nrow(df))
+
+  
+  # Model performance metrics
+data.frame(
+  RMSE = RMSE,
+  Rsquare = R_square
+)
+  
+}
+
+# Prediction and evaluation on train data
+predictions_train <- predict(ridge_reg, s = optimal_lambda, newx = x)
+eval_results(y_train, predictions_train, train)
+
+# Prediction and evaluation on test data
+predictions_test <- predict(ridge_reg, s = optimal_lambda, newx = x_test)
+eval_results(y_test, predictions_test, test)
+
+```
+```{r}
+#getting optimal lambda value
+
+lambdas <- 10^seq(2, -3, by = -.1)
+
+# Setting alpha = 1 implements lasso regression
+lasso_reg <- cv.glmnet(x, y_train, alpha = 1, lambda = lambdas, standardize = TRUE, nfolds = 5)
+
+# with optimal 
+lambda_best <- lasso_reg$lambda.min 
+lambda_best
+
+
+```
+```{r}
+#train  model
+lasso_model <- glmnet(x, y_train, alpha = 1, lambda = lambda_best, standardize = TRUE)
+
+#generate predictions
+predictions_train <- predict(lasso_model, s = lambda_best, newx = x)
+eval_results(y_train, predictions_train, train)
+
+predictions_test <- predict(lasso_model, s = lambda_best, newx = x_test)
+eval_results(y_test, predictions_test, test)
+```
+
+```{r}
+#Elastic Net Regression
+
+# Set training control
+train_cont <- trainControl(method = "repeatedcv",
+                              number = 10,
+                              repeats = 5,
+                              search = "random",
+                              verboseIter = TRUE)
+
+# Train the model
+elastic_reg <- train(Avg_Mdcr_Pymt_Amt ~ .,
+                           data = train,
+                           method = "glmnet",
+                           preProcess = c("center", "scale"),
+                           tuneLength = 10,
+                           trControl = train_cont)
+
+
+# Best tuning parameter
+elastic_reg$bestTune
+```
+
+```{r}
+# Make predictions on training set
+predictions_train <- predict(elastic_reg, x)
+eval_results(y_train, predictions_train, train) 
+
+# Make predictions on test set
+predictions_test <- predict(elastic_reg, x_test)
+eval_results(y_test, predictions_test, test)
+
+```
